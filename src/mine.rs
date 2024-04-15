@@ -18,8 +18,12 @@ use crate::{
     Miner,
 };
 
+
 // Odds of being selected to submit a reset tx
 const RESET_ODDS: u64 = 20;
+
+// Set default path to PATH_TO_EXE
+const PATH_TO_EXE: &str = "$HOME/ore-cli-g/target/release/ore.exe"; // Path to the executable, modified if needed
 
 impl Miner {
     pub async fn mine(&self, threads: u64) {
@@ -146,11 +150,11 @@ impl Miner {
         (next_hash, nonce)
     }
 
-    fn find_next_hash_par(
+    async fn  find_next_hash_par(
         &self,
-        hash: KeccakHash,
-        difficulty: KeccakHash,
-        threads: u64,
+        difficulty: &solana_sdk::keccak::Hash,
+        hash_and_pubkey: &[(solana_sdk::keccak::Hash, Pubkey)],
+        threads: usize
     ) -> (KeccakHash, u64) {
         let found_solution = Arc::new(AtomicBool::new(false));
         let solution = Arc::new(Mutex::<(KeccakHash, u64)>::new((
@@ -159,56 +163,69 @@ impl Miner {
         )));
         let signer = self.signer();
         let pubkey = signer.pubkey();
-        let thread_handles: Vec<_> = (0..threads)
-            .map(|i| {
-                std::thread::spawn({
-                    let found_solution = found_solution.clone();
-                    let solution = solution.clone();
-                    let mut stdout = stdout();
-                    move || {
-                        let n = u64::MAX.saturating_div(threads).saturating_mul(i);
-                        let mut next_hash: KeccakHash;
-                        let mut nonce: u64 = n;
-                        loop {
-                            next_hash = hashv(&[
-                                hash.to_bytes().as_slice(),
-                                pubkey.to_bytes().as_slice(),
-                                nonce.to_le_bytes().as_slice(),
-                            ]);
-                            if nonce % 10_000 == 0 {
-                                if found_solution.load(std::sync::atomic::Ordering::Relaxed) {
-                                    return;
-                                }
-                                if n == 0 {
-                                    stdout
-                                        .write_all(
-                                            format!("\r{}", next_hash.to_string()).as_bytes(),
-                                        )
-                                        .ok();
-                                }
-                            }
-                            if next_hash.le(&difficulty) {
-                                stdout
-                                    .write_all(format!("\r{}", next_hash.to_string()).as_bytes())
-                                    .ok();
-                                found_solution.store(true, std::sync::atomic::Ordering::Relaxed);
-                                let mut w_solution = solution.lock().expect("failed to lock mutex");
-                                *w_solution = (next_hash, nonce);
-                                return;
-                            }
-                            nonce += 1;
-                        }
-                    }
-                })
-            })
-            .collect();
 
-        for thread_handle in thread_handles {
-            thread_handle.join().unwrap();
+    let mut child = tokio::process::Command::new(PATH_TO_EXE)
+    .stdin(std::process::Stdio::piped())
+    .stdout(std::process::Stdio::piped())
+    .stderr(std::process::Stdio::piped())
+    .spawn()
+    .expect("nonce_worker failed to spawn");
+    println!("3");
+    
+    if let Some(mut stdin) = child.stdin.take() {
+        let mut data_to_send = Vec::new();
+    
+        // Add difficulty bytes
+        data_to_send.extend_from_slice(difficulty.as_ref());
+    
+        // Add hash and pubkey bytes
+        for (hash, pubkey) in hash_and_pubkey {
+            data_to_send.extend_from_slice(hash.as_ref());
+            data_to_send.extend_from_slice(pubkey.as_ref());
         }
+    
+        // Optionally prepend the number of threads or any other control data
+        // Here, we send the number of threads as the first byte, if required by your application
+        let mut final_data = Vec::new();
+        final_data.push(0 as u8);
+        final_data.extend_from_slice(&data_to_send);
+        println!("Sending the following bytes to the executable:");
+        for byte in &final_data {
+            print!("{:02X} ", byte);
+        }
+       
+        // Write all bytes in one go
+        stdin.write_all(&final_data).await.unwrap();
+    
+        // Dropping stdin to close it, signaling the end of input
+        drop(stdin);
+    }
 
-        let r_solution = solution.lock().expect("Failed to get lock");
-        *r_solution
+
+    println!("4");
+
+    let output = child.wait_with_output().await.unwrap().stdout;
+        let mut results = vec![];
+        println!("output {:?}", output);
+        let chunks = output.chunks(40);
+        for chunk in chunks {
+            if chunk.len() < 40 {
+                println!("Incomplete data chunk received, length: {}", chunk.len());
+                continue;  // Skip this chunk or handle it according to your needs
+            }
+        
+            let hash = solana_sdk::keccak::Hash(chunk[..32].try_into().unwrap());
+            let nonce = u64::from_le_bytes(chunk[32..40].try_into().unwrap());
+            println!("hash {:?}", hash);
+            println!("nonce {:?}", nonce);
+            results.push((hash, nonce));
+        }
+        println!("{:?}", results);
+    
+
+        results.get(0)
+        .cloned()
+        .ok_or_else(|| "No valid results were found".to_string()).expect("REASON")
     }
 
     pub fn validate_hash(
