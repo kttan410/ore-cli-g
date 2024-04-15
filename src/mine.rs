@@ -1,16 +1,10 @@
 use std::{
-    io::{stdout, Write,BufRead},
-    sync::{atomic::AtomicBool, Arc, Mutex},
-    mem
+    io::{stdout, Write}, 
+    sync::{Arc, Mutex},  
 };
-use std::process::Command;
-use std::str::FromStr;
-use bs58;
-use hex;
-use ore::{self, state::Bus, BUS_ADDRESSES, BUS_COUNT, EPOCH_DURATION};
-use rand::Rng;
+use ore::{self, state::Bus, BUS_ADDRESSES, BUS_COUNT, EPOCH_DURATION};  
+use rand::Rng;  
 use solana_program::{keccak::HASH_BYTES, program_memory::sol_memcmp, pubkey::Pubkey};
-use solana_sdk::{
     compute_budget::ComputeBudgetInstruction,
     keccak::{hashv, Hash as KeccakHash},
     signature::Signer,
@@ -20,9 +14,8 @@ use crate::{
     utils::{get_clock_account, get_proof, get_treasury},
     Miner,
 };
-use base64::{encode};
-use tokio::io::{AsyncWriteExt, BufReader, AsyncBufReadExt};
-// Odds of being selected to submit a reset tx
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;  
+
 const RESET_ODDS: u64 = 20;
 
 // Set default path to PATH_TO_EXE
