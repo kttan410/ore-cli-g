@@ -19,7 +19,7 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 const RESET_ODDS: u64 = 20;
 
 // Set default path to PATH_TO_EXE
-const PATH_TO_EXE: &str = "$HOME/ore-cli-g/target/release/ore.exe"; // Path to the executable, modified if needed
+const PATH_TO_EXE: &str = "$HOME/ore-cli-gpu/linux"; // Path to the executable, modified if needed
 
 impl Miner {
     pub async fn mine(&self, threads: u64) {
