@@ -4,9 +4,9 @@ use std::{
 };
 use ore::{self, state::Bus, BUS_ADDRESSES, BUS_COUNT, EPOCH_DURATION};  
 use rand::Rng;  
-use solana_program::{keccak::HASH_BYTES, program_memory::sol_memcmp, pubkey::Pubkey};
+use solana_program::{keccak::{hashv, Hash as KeccakHash}, program_memory::sol_memcmp, pubkey::Pubkey};
+use solana_sdk::{
     compute_budget::ComputeBudgetInstruction,
-    keccak::{hashv, Hash as KeccakHash},
     signature::Signer,
 };
 use crate::{
@@ -14,7 +14,7 @@ use crate::{
     utils::{get_clock_account, get_proof, get_treasury},
     Miner,
 };
-use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;  
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 
 const RESET_ODDS: u64 = 20;
 
