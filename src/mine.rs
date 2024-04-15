@@ -53,9 +53,12 @@ impl Miner {
 
             // Escape sequence that clears the screen and the scrollback buffer
             println!("\nMining for a valid hash...");
+            println!("Calling find_next_hash_par");
+            let hash_and_pubkey = [(solana_sdk::keccak::Hash::new_from_array(proof.hash.0),signer.pubkey())];
             let (next_hash, nonce) =
-                self.find_next_hash_par(proof.hash.into(), treasury.difficulty.into(), threads);
-
+                self.find_next_hash_par(&treasury.difficulty.into(),&hash_and_pubkey, 0).await;
+                println!("Called find_next_hash_par");
+                println!("{} {}",next_hash, nonce);
             // Submit mine tx.
             // Use busses randomly so on each epoch, transactions don't pile on the same busses
             println!("\n\nSubmitting hash for validation...");
