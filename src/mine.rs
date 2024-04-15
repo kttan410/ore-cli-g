@@ -1,8 +1,12 @@
 use std::{
-    io::{stdout, Write},
+    io::{stdout, Write,BufRead},
     sync::{atomic::AtomicBool, Arc, Mutex},
+    mem
 };
-
+use std::process::Command;
+use std::str::FromStr;
+use bs58;
+use hex;
 use ore::{self, state::Bus, BUS_ADDRESSES, BUS_COUNT, EPOCH_DURATION};
 use rand::Rng;
 use solana_program::{keccak::HASH_BYTES, program_memory::sol_memcmp, pubkey::Pubkey};
@@ -11,14 +15,13 @@ use solana_sdk::{
     keccak::{hashv, Hash as KeccakHash},
     signature::Signer,
 };
-
 use crate::{
     cu_limits::{CU_LIMIT_MINE, CU_LIMIT_RESET},
     utils::{get_clock_account, get_proof, get_treasury},
     Miner,
 };
-
-
+use base64::{encode};
+use tokio::io::{AsyncWriteExt, BufReader, AsyncBufReadExt};
 // Odds of being selected to submit a reset tx
 const RESET_ODDS: u64 = 20;
 
